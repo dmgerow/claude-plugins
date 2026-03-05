@@ -40,6 +40,11 @@ The user wants to add a sidecar service to their `docker-compose.yml`. Argument:
 5. Write the updated `docker-compose.yml`
 6. Commit and push
 
+## Tailscale best practices and troubleshooting
+
+Refer to the official Tailscale Docker guide for best practices and troubleshooting:
+https://tailscale.com/blog/docker-tailscale-guide
+
 ## Tailscale sidecar reference
 
 When the sidecar is Tailscale, use this proven pattern:
