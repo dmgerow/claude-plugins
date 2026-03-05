@@ -1,0 +1,15 @@
+{
+  "name": "dmgerow-plugins",
+  "owner": { "name": "dmgerow" },
+  "metadata": {
+    "description": "Personal Claude Code plugins",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "homelab",
+      "source": "./plugins/homelab",
+      "description": "Docker infrastructure tools for homelab deployments via Portainer"
+    }
+  ]
+}

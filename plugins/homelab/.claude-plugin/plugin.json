@@ -1,0 +1,6 @@
+{
+  "name": "homelab",
+  "description": "Docker infrastructure tools for homelab deployments via Portainer",
+  "version": "0.1.0",
+  "author": { "name": "dmgerow" }
+}
