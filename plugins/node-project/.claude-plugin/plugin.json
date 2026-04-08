@@ -1,0 +1,6 @@
+{
+  "name": "node-project",
+  "description": "Shared Node.js project development commands for self-hosted apps",
+  "version": "0.1.0",
+  "author": { "name": "dmgerow" }
+}

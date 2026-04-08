@@ -10,6 +10,11 @@
       "name": "homelab",
       "source": "./plugins/homelab",
       "description": "Docker infrastructure tools for homelab deployments via Portainer"
+    },
+    {
+      "name": "node-project",
+      "source": "./plugins/node-project",
+      "description": "Shared Node.js project development commands: /ship, /lint-fix, /test, /review"
     }
   ]
 }
