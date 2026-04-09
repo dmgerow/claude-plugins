@@ -1,5 +1,5 @@
 ---
-description: Pre-flight check, commit, push, open PR, watch CI, fix failures, and squash-merge
+description: Pre-flight check, commit, push, open PR, watch CI, fix failures, squash-merge, and babysit release + deploy workflows to completion
 argument-hint: "[commit message or description of changes]"
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(npm run:*), Bash(npm test:*), Bash(npx tsc:*), Bash(npx eslint:*), Read, Edit, Glob, Grep
 ---
@@ -13,7 +13,7 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(npm run:*), Bash(npm test:*), Bash(
 
 ## Your task
 
-Ship the current changes end-to-end: pre-flight → commit → PR → watch CI → fix if needed → merge.
+Ship the current changes end-to-end: pre-flight → commit → PR → watch CI → fix if needed → merge → watch release-please → merge release PR → watch deploy to completion.
 
 Arguments (description of changes or commit message hint): `$ARGUMENTS`
 
@@ -42,8 +42,10 @@ If any step fails and cannot be auto-fixed, stop and report the issue. Do not pr
 
 ### Step 3 — Open PR
 
+The PR title **must** be in Conventional Commits format — this is enforced by a CI check and will fail if wrong.
+
 ```bash
-gh pr create --title "<commit message>" --body "$(cat <<'EOF'
+gh pr create --title "<type>: <description>" --body "$(cat <<'EOF'
 ## Summary
 <1-3 bullet points describing the change>
 
@@ -60,21 +62,10 @@ Capture the PR number and URL from the output.
 
 ### Step 4 — Watch CI
 
-Poll CI status every 30 seconds. Use:
+Use `gh run watch` to monitor CI:
 
 ```bash
 gh pr checks <PR_NUMBER> --watch --interval 30
-```
-
-Or if `--watch` is unavailable, manually poll:
-```bash
-while true; do
-  STATUS=$(gh pr checks <PR_NUMBER> --json name,status,conclusion --jq '[.[] | select(.name != "Auto-merge Release PR")] | if all(.conclusion == "success") then "pass" elif any(.conclusion == "failure") then "fail" else "pending" end')
-  echo "CI status: $STATUS"
-  [ "$STATUS" = "pass" ] && break
-  [ "$STATUS" = "fail" ] && break
-  sleep 30
-done
 ```
 
 Track fix attempts by counting commits with `[ci-fix]` in the message:
@@ -82,8 +73,13 @@ Track fix attempts by counting commits with `[ci-fix]` in the message:
 FIX_ATTEMPTS=$(git log --oneline | grep -c '\[ci-fix\]' || true)
 ```
 
-**If CI passes** → proceed to Step 5.
-**If CI fails** → proceed to fix loop (Step 4a).
+**If the PR title validation check fails**, fix the title immediately and re-check:
+```bash
+gh pr edit <PR_NUMBER> --title "<type>: <description>"
+```
+
+**If all checks pass** → proceed to Step 5.
+**If CI fails for other reasons** → proceed to fix loop (Step 4a).
 
 ### Step 4a — CI fix loop (max 3 attempts)
 
@@ -97,7 +93,7 @@ Otherwise:
 
 1. Get the failure logs:
    ```bash
-   RUN_ID=$(gh run list --branch <BRANCH> --workflow CI --limit 1 --json databaseId --jq '.[0].databaseId')
+   RUN_ID=$(gh run list --branch <BRANCH> --limit 1 --json databaseId --jq '.[0].databaseId')
    gh run view $RUN_ID --log-failed
    ```
 
@@ -127,6 +123,61 @@ Once CI passes:
 gh pr merge <PR_NUMBER> --squash --delete-branch
 ```
 
-Report success: "Shipped! PR #<N> merged. Release-please will open a release PR automatically when ready."
+Then proceed immediately to Step 6 — do not stop here.
 
-If the merge fails (e.g. PR not mergeable), report the error and leave the PR open for manual merge.
+### Step 6 — Watch release-please workflow
+
+After merging, a `release-please` workflow will trigger on `main`. Find and watch it:
+
+```bash
+gh run list --limit 5
+```
+
+Identify the in-progress run on `main` triggered by the merge push (workflow name contains "release-please"). Then watch it:
+
+```bash
+gh run watch <RUN_ID> --interval 30
+```
+
+**If release-please creates a release PR** (look for a PR titled `chore(main): release ...`):
+
+```bash
+gh pr list --json number,title --jq '.[] | select(.title | test("release"; "i")) | .number'
+```
+
+Merge it immediately:
+```bash
+gh pr merge <RELEASE_PR_NUMBER> --squash --delete-branch
+```
+
+**If release-please does not create a release PR** (e.g. it was a `chore:` or `ci:` commit that doesn't trigger a release), skip to the end and report.
+
+**If the release-please workflow fails**, inspect the logs:
+```bash
+gh run view <RUN_ID> --log-failed
+```
+Note: A failure in the "Assign release PR" step (exit code 127, `gh` not found) is non-fatal — the release PR is still created. Confirm the PR exists before treating this as a real failure.
+
+### Step 7 — Watch deploy workflow
+
+After merging the release PR, a new workflow run will trigger on `main` that builds and pushes the Docker image and triggers the Portainer redeploy. Find and watch it:
+
+```bash
+gh run list --limit 5
+```
+
+Identify the new in-progress run triggered by the release PR merge, then watch it to completion:
+
+```bash
+gh run watch <RUN_ID> --interval 30
+```
+
+If it fails, inspect logs:
+```bash
+gh run view <RUN_ID> --log-failed
+```
+Report the failure to the user — do not attempt to auto-fix deploy failures.
+
+Once the deploy run completes successfully, report:
+
+> Shipped and deployed! PR #N merged → release PR #M merged → vX.Y.Z deployed successfully.
