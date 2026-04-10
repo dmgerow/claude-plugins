@@ -70,6 +70,7 @@ services:
       TS_EXTRA_ARGS: --advertise-tags=tag:docker
       TS_STATE_DIR: /var/lib/tailscale
       TS_SERVE_CONFIG: /tmp/ts-serve.json
+      TS_EPHEMERAL: false
     entrypoint:
       - /bin/sh
       - -c
